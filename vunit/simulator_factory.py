@@ -10,6 +10,7 @@ Create simulator instances
 
 from vunit.modelsim_interface import ModelSimInterface
 from vunit.ghdl_interface import GHDLInterface
+from vunit.nvc_interface import NvcInterface
 from os.path import join, exists
 import os
 
@@ -24,7 +25,7 @@ class SimulatorFactory(object):
         """
         Return a list of supported simulator classes
         """
-        return [ModelSimInterface, GHDLInterface]
+        return [ModelSimInterface, GHDLInterface, NvcInterface]
 
     @classmethod
     def available_simulators(cls):
