@@ -140,6 +140,12 @@ class VUnit(object):  # pylint: disable=too-many-instance-attributes, too-many-p
         if compile_builtins:
             self.add_builtins(library_name="vunit_lib")
 
+    def _sim_supports_context(self):
+        """
+        Returns true if the current simulator supports VHDL-2008 context
+        """
+        return True
+
     def _create_project(self):
         """
         Create Project instance
@@ -445,7 +451,8 @@ class VUnit(object):  # pylint: disable=too-many-instance-attributes, too-many-p
         Add vunit builtin libraries
         """
         library = self.add_library(library_name)
-        add_builtins(library, self._vhdl_standard, mock_lang, mock_log)
+        add_builtins(library, self._vhdl_standard, mock_lang, mock_log,
+                     no_context=not self._sim_supports_context())
 
     def add_com(self, library_name="vunit_lib", use_debug_codecs=None):
         """
@@ -458,7 +465,8 @@ class VUnit(object):  # pylint: disable=too-many-instance-attributes, too-many-p
         if use_debug_codecs is not None:
             self._use_debug_codecs = use_debug_codecs
         add_com(library, self._vhdl_standard,
-                use_debug_codecs=self._use_debug_codecs)
+                use_debug_codecs=self._use_debug_codecs,
+                no_context=not self._sim_supports_context())
 
     def add_array_util(self, library_name="vunit_lib"):
         """
@@ -475,7 +483,8 @@ class VUnit(object):  # pylint: disable=too-many-instance-attributes, too-many-p
             library = self.add_library(library_name)
         else:
             library = self.library(library_name)
-        add_osvvm(library)
+        add_osvvm(library,
+                  no_context=not self._sim_supports_context())
 
     def get_project_compile_order(self, target=None):
         """

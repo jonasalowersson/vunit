@@ -15,7 +15,7 @@ from glob import glob
 VHDL_PATH = abspath(join(dirname(__file__), "..", "vhdl"))
 
 
-def add_builtins(library, vhdl_standard, mock_lang=False, mock_log=False):
+def add_builtins(library, vhdl_standard, mock_lang=False, mock_log=False, no_context=False):
     """
     Add vunit builtin libraries
     """
@@ -110,7 +110,9 @@ def add_builtins(library, vhdl_standard, mock_lang=False, mock_log=False):
         """Return built-in VHDL files present only in 2008"""
         files = []
 
-        files += ["vunit_context.vhd"]
+        if not no_context:
+            files += ["vunit_context.vhd"]
+
         files += [join("run", "src", "stop_body_2008.vhd")]
 
         return files
@@ -149,16 +151,20 @@ def add_array_util(library, vhdl_standard):
     library.add_source_files(join(VHDL_PATH, "array", "src", "array_pkg.vhd"))
 
 
-def add_osvvm(library):
+def add_osvvm(library, no_context=False):
     """
     Add osvvm library
     """
+    ignored = ['AlertLogPkg_body_BVUL.vhd']
+    if no_context:
+        ignored.append('OsvvmContext.vhd')
+
     for file_name in glob(join(VHDL_PATH, "osvvm", "*.vhd")):
-        if basename(file_name) != 'AlertLogPkg_body_BVUL.vhd':
+        if basename(file_name) not in ignored:
             library.add_source_files(file_name, preprocessors=[])
 
 
-def add_com(library, vhdl_standard, use_debug_codecs=False):
+def add_com(library, vhdl_standard, use_debug_codecs=False, no_context=False):
     """
     Add com library
     """
@@ -169,7 +175,8 @@ def add_com(library, vhdl_standard, use_debug_codecs=False):
     library.add_source_files(join(VHDL_PATH, "com", "src", "com_api.vhd"))
     library.add_source_files(join(VHDL_PATH, "com", "src", "com_types.vhd"))
     library.add_source_files(join(VHDL_PATH, "com", "src", "com_codec_api.vhd"))
-    library.add_source_files(join(VHDL_PATH, "com", "src", "com_context.vhd"))
+    if not no_context:
+        library.add_source_files(join(VHDL_PATH, "com", "src", "com_context.vhd"))
     library.add_source_files(join(VHDL_PATH, "com", "src", "com_string.vhd"))
     library.add_source_files(join(VHDL_PATH, "com", "src", "com_debug_codec_builder.vhd"))
     library.add_source_files(join(VHDL_PATH, "com", "src", "com_std_codec_builder.vhd"))
