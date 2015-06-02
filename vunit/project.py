@@ -466,7 +466,7 @@ class SourceFile(object):
             result.append(DesignUnit(configuration.identifier, self, 'configuration'))
 
         for body in design_file.package_bodies:
-            result.append(DesignUnit('package body for ' + body.identifier,
+            result.append(DesignUnit(body.identifier,
                                      self, 'package body', False, body.identifier))
 
         return result

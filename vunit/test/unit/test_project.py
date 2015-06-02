@@ -563,7 +563,7 @@ end architecture;
         """
         unit = self._find_design_unit(source_file_name,
                                       "package body",
-                                      "package body for " + package_name,
+                                      package_name,
                                       False, package_name)
         self.assertIsNotNone(unit)
 
@@ -623,16 +623,17 @@ end architecture;
                           is_primary=True,
                           primary_design_unit_name=None):
         """
-        Utility fnction to find and return a design unit
+        Utility function to find and return a design unit
         """
 
         for source_file in self.project.get_source_files_in_order():
             for design_unit in source_file.design_units:
                 if design_unit.name != design_unit_name:
                     continue
+                if design_unit.unit_type != design_unit_type:
+                    continue
 
                 self.assertEqual(design_unit.is_primary, is_primary)
-                self.assertEqual(design_unit.unit_type, design_unit_type)
                 self.assertEqual(source_file.name, source_file_name)
                 if not is_primary:
                     self.assertEqual(design_unit.primary_design_unit, primary_design_unit_name)
