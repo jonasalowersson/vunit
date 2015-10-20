@@ -356,6 +356,7 @@ class VUnit(object):  # pylint: disable=too-many-instance-attributes, too-many-p
         report = TestReport(printer=self._printer)
         try:
             self._run_test(test_cases, report)
+            self._merge_coverage(simulator_if, test_cases)
         except KeyboardInterrupt:
             print()
             LOGGER.debug("_main: Caught Ctrl-C shutting down")
@@ -447,6 +448,14 @@ class VUnit(object):  # pylint: disable=too-many-instance-attributes, too-many-p
                             verbose=self._verbose,
                             num_threads=self._num_threads)
         runner.run(test_cases)
+
+    def _merge_coverage(self, simulator_if, test_cases):
+        """
+        Merge coverage databases if applicable
+        """
+        if simulator_if.name=="modelsim":
+            if simulator_if._coverage:
+                simulator_if.merge_coverage(test_cases, self._output_path)
 
     def _post_process(self, report):
         """
