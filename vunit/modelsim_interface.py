@@ -56,6 +56,11 @@ class ModelSimInterface(SimulatorInterface):  # pylint: disable=too-many-instanc
                            action="store_true",
                            default=False,
                            help="Do not re-use the same vsim process for running different test cases (slower)")
+        group.add_argument("--coverage",
+                           default=None,
+                           help=('Enable code coverage. '
+                                 'Choose any of the standard vsim "bcestf" or "all" for everything. '
+                                 'Experimental feature not supported by VUnit main developers'))
 
     @classmethod
     def from_args(cls, output_path, args):
@@ -66,6 +71,7 @@ class ModelSimInterface(SimulatorInterface):  # pylint: disable=too-many-instanc
 
         return cls(join(output_path, "modelsim.ini"),
                    persistent=persistent,
+                   coverage=args.coverage,
                    gui_mode=args.gui)
 
     @classmethod
@@ -87,7 +93,7 @@ class ModelSimInterface(SimulatorInterface):  # pylint: disable=too-many-instanc
         """
         return cls._find_prefix() is not None
 
-    def __init__(self, modelsim_ini="modelsim.ini", persistent=False, gui_mode=None):
+    def __init__(self, modelsim_ini="modelsim.ini", persistent=False, gui_mode=None, coverage=None):
         self._modelsim_ini = abspath(modelsim_ini)
 
         # Workarround for Microsemi 10.3a which does not
@@ -109,6 +115,8 @@ class ModelSimInterface(SimulatorInterface):  # pylint: disable=too-many-instanc
         self._persistent = persistent
         self._gui_mode = gui_mode
         assert gui_mode in (None, "run", "load")
+        self._coverage = coverage
+        self._coverage_files = set()
         assert not (persistent and (gui_mode is not None))
         self._create_modelsim_ini()
 
@@ -187,8 +195,15 @@ class ModelSimInterface(SimulatorInterface):  # pylint: disable=too-many-instanc
         Compiles a vhdl file into a specific library using a specfic vhdl_standard
         """
         try:
-            proc = Process([join(self._prefix, 'vcom'), '-quiet', '-modelsimini', self._modelsim_ini,
-                            '-' + vhdl_standard, '-work', library_name, source_file_name])
+            if self._coverage is None:
+                coverage_args = []
+            else:
+                coverage_args = ['+cover']
+
+            proc = Process([join(self._prefix, 'vcom'), '-quiet', '-modelsimini', self._modelsim_ini] +
+                           coverage_args +
+                           ['-' + vhdl_standard, '-work', library_name, source_file_name])
+
             proc.consume_output()
         except Process.NonZeroExitCode:
             return False
@@ -199,9 +214,15 @@ class ModelSimInterface(SimulatorInterface):  # pylint: disable=too-many-instanc
         Compiles a verilog file into a specific library
         """
         try:
+            if self._coverage is None:
+                coverage_args = []
+            else:
+                coverage_args = ['+cover']
 
-            args = [join(self._prefix, 'vlog'), '-sv', '-quiet', '-modelsimini', self._modelsim_ini,
-                    '-work', library_name, source_file_name]
+            args = [join(self._prefix, 'vlog'), '-sv', '-quiet', '-modelsimini', self._modelsim_ini]
+            args += coverage_args
+            args += ['-work', library_name, source_file_name]
+
             for library in self._libraries.values():
                 args += ["-L", library.name]
             for include_dir in include_dirs:
@@ -242,7 +263,7 @@ class ModelSimInterface(SimulatorInterface):  # pylint: disable=too-many-instanc
             del libraries["others"]
         return libraries
 
-    def _create_load_function(self,  # pylint: disable=too-many-arguments
+    def _create_load_function(self,  # pylint: disable=too-many-arguments,too-many-locals
                               library_name, entity_name, architecture_name,
                               config, output_path):
         """
@@ -259,6 +280,19 @@ class ModelSimInterface(SimulatorInterface):  # pylint: disable=too-many-instanc
         else:
             architecture_suffix = "(%s)" % architecture_name
 
+        if self._coverage is None:
+            coverage_save_cmd = ""
+            coverage_args = ""
+        else:
+            coverage_file = join(output_path, "coverage.ucdb")
+            self._coverage_files.add(coverage_file)
+            coverage_save_cmd = "coverage save -onexit -assert -directive -cvg -codeAll {%s}" % fix_path(coverage_file)
+
+            if self._coverage == "all":
+                coverage_args = "-coverage=bcestf"
+            else:
+                coverage_args = "-coverage=" + self._coverage
+
         vsim_flags = ["-wlf {%s}" % fix_path(join(output_path, "vsim.wlf")),
                       "-quiet",
                       "-t ps",
@@ -267,6 +301,7 @@ class ModelSimInterface(SimulatorInterface):  # pylint: disable=too-many-instanc
                       pli_str,
                       set_generic_name_str,
                       library_name + "." + entity_name + architecture_suffix,
+                      coverage_args,
                       self._vsim_extra_args(config)]
 
         # There is a known bug in modelsim that prevents the -modelsimini flag from accepting
@@ -298,9 +333,12 @@ proc vunit_load {{{{vsim_extra_args ""}}}} {{
         echo {{Error: 2) No vunit test runner package used}}
         return 1
     }}
+
+    {coverage_save_cmd}
     return 0
 }}
 """.format(set_generic_str=set_generic_str,
+           coverage_save_cmd=coverage_save_cmd,
            vsim_flags=" ".join(vsim_flags))
 
         return tcl
@@ -574,6 +612,25 @@ if {![vunit_load -vhdlvariablelogging]} {
         for proc in self._vsim_processes.values():
             if proc.is_alive():
                 proc.wait()
+
+    def post_process(self, output_path):
+        """
+        Merge coverage from all test cases,
+        top hierarchy level is removed since it has different name in each test case
+        """
+        if self._coverage is None:
+            return
+
+        vcover_cmd = "vcover merge -strip 1 " + join(output_path, "merged_coverage.ucdb")
+
+        for coverage_file in self._coverage_files:
+            if file_exists(coverage_file):
+                vcover_cmd = vcover_cmd + " " + coverage_file
+
+        print("Merging coverage files ...")
+        vcover_merge_process = Process(vcover_cmd)
+        vcover_merge_process.consume_output()
+        print("Done merging coverage files")
 
 
 def output_consumer(line):
