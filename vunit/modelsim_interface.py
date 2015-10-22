@@ -198,7 +198,10 @@ class ModelSimInterface(SimulatorInterface):  # pylint: disable=too-many-instanc
             if self._coverage is None:
                 coverage_args = []
             else:
-                coverage_args = ['+cover']
+                if self._coverage == "all":
+                    coverage_args = ['+cover=bcestf']
+                else:
+                    coverage_args = ['+cover=' + self._coverage]
 
             proc = Process([join(self._prefix, 'vcom'), '-quiet', '-modelsimini', self._modelsim_ini] +
                            coverage_args +
@@ -217,7 +220,10 @@ class ModelSimInterface(SimulatorInterface):  # pylint: disable=too-many-instanc
             if self._coverage is None:
                 coverage_args = []
             else:
-                coverage_args = ['+cover']
+                if self._coverage == "all":
+                    coverage_args = ['+cover=bcestf']
+                else:
+                    coverage_args = ['+cover=' + self._coverage]
 
             args = [join(self._prefix, 'vlog'), '-sv', '-quiet', '-modelsimini', self._modelsim_ini]
             args += coverage_args
